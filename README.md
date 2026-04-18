@@ -26,37 +26,29 @@ FinTrustRAG solves this by introducing the **Numerical Consistency Trust Scorer 
 
 ## 🏗️ System Architecture
 
-```
-User
- │
- ▼
-┌─────────────────────────────────────────────────────────┐
-│                    React Frontend                        │
-│  [Upload Panel] [Question Panel] [Result Panel]         │
-└─────────────────────────┬───────────────────────────────┘
-                          │ HTTP
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│                   FastAPI Backend                        │
-│                                                         │
-│  Layer 1: Document Ingestion (PyMuPDF4LLM)             │
-│       ↓ PDF → Pages → Chunks → FAISS Index             │
-│                                                         │
-│  Layer 2: Hybrid Retrieval Engine                       │
-│       ↓ FAISS (dense) + BM25 (sparse) + RRF fusion     │
-│                                                         │
-│  Layer 3: LLM Answer Generation                        │
-│       ↓ Groq API (Llama-3.1-8B)                       │
-│                                                         │
-│  Layer 4: NCTS Verification ⭐ (Core Innovation)       │
-│       ↓ Number Extraction → Grounding → Math Check     │
-│                                                         │
-│  Layer 5: Response Formatter                           │
-│       ↓ Answer + Trust Score + Confidence Label        │
-└─────────────────────────────────────────────────────────┘
-```
+FinTrustRAG follows a six-layer modular pipeline:
 
----
+| Layer | Module             | Technology                          |
+| ----- | ------------------ | ----------------------------------- |
+| 1     | React Frontend     | Upload · Question · Result panels   |
+| 2     | Document Ingestion | PyMuPDF4LLM · 500-word chunks       |
+| 3     | Hybrid Retrieval   | FAISS + BM25 + RRF fusion           |
+| 4     | LLM Generation     | Groq API · Llama-3.1-8B             |
+| **5** | **NCTS ⭐**        | **Trust scoring — core innovation** |
+| 6     | Output Formatter   | Answer + score + confidence badge   |
+
+### NCTS Trust Score Formula
+
+```
+T = 0.6 × G + 0.4 × M
+
+G = Grounding Score (numbers found in source?)
+M = Math Score (formula verified?)
+
+T ≥ 0.80 → 🟢 HIGH CONFIDENCE
+T ≥ 0.50 → 🟡 MEDIUM CONFIDENCE
+T < 0.50 → 🔴 LOW CONFIDENCE ⚠️
+```
 
 ## ⭐ Core Innovation: NCTS
 
