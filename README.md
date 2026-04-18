@@ -255,7 +255,7 @@ Final Year Project — 2025
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+This project was developed as a Final Year Academic Project and is intended for educational purposes only.
 
 ---
 
