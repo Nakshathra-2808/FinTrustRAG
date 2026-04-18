@@ -37,6 +37,8 @@ FinTrustRAG follows a six-layer modular pipeline:
 | **5** | **NCTS ⭐**        | **Trust scoring — core innovation** |
 | 6     | Output Formatter   | Answer + score + confidence badge   |
 
+![alt text](image.png)
+
 ### NCTS Trust Score Formula
 
 ```
