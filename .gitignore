@@ -1,0 +1,23 @@
+# Virtual environment - too large to push
+venv/
+
+# API keys - never push!
+backend/.env
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Data files - PDFs and chunks
+backend/data/
+
+# Node modules
+node_modules/
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
+desktop.ini
