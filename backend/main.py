@@ -19,27 +19,21 @@ class QuestionRequest(BaseModel):
     question: str
     session_id: str
 
-
 @app.get("/health")
 def health_check():
     return {"status": "FinTrustRAG backend is running ✅"}
-
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files accepted")
-
     session_id = str(uuid.uuid4())[:8]
     os.makedirs("data", exist_ok=True)
     save_path = f"data/{session_id}_{file.filename}"
     content = await file.read()
-
     with open(save_path, "wb") as f:
         f.write(content)
-
     print(f"📁 Saved PDF: {save_path}")
-
     try:
         from ingestion import ingest_pdf
         chunks = ingest_pdf(save_path, session_id)
@@ -54,24 +48,19 @@ async def upload_pdf(file: UploadFile = File(...)):
         print(f"❌ Ingestion error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/ask")
 async def ask_question(request: QuestionRequest):
     try:
         from ingestion import load_chunks
         from retrieval import retrieve
         from generation import generate_answer
+        from ncts import compute_ncts
 
-        # Step 1: Load chunks for this session
-        chunks = load_chunks(request.session_id)
-
-        # Step 2: Retrieve top-5 most relevant chunks
+        chunks     = load_chunks(request.session_id)
         top_chunks = retrieve(request.question, request.session_id, chunks)
+        result     = generate_answer(request.question, top_chunks)
+        ncts_result = compute_ncts(result["answer"], top_chunks)
 
-        # Step 3: Generate answer using Groq LLM
-        result = generate_answer(request.question, top_chunks)
-
-        # Step 4: Format source chunks for frontend
         source_chunks = [
             {
                 "chunk_id": c["chunk_id"],
@@ -85,13 +74,7 @@ async def ask_question(request: QuestionRequest):
         return {
             "answer": result["answer"],
             "model_used": result["model_used"],
-            "ncts": {
-                "grounding_score": 0.0,
-                "math_score": 0.0,
-                "trust_score": 0.0,
-                "confidence_label": "PENDING",
-                "flagged_numbers": []
-            },
+            "ncts": ncts_result,
             "source_chunks": source_chunks,
             "session_id": request.session_id
         }
@@ -103,7 +86,6 @@ async def ask_question(request: QuestionRequest):
     except Exception as e:
         print(f"❌ Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
