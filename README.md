@@ -2,11 +2,6 @@
 
 ### A Numerical Consistency Trust Scoring Framework for Hallucination Detection in Financial RAG
 
-[![Python](https://img.shields.io/badge/Python-3.13-blue)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-
 ---
 
 ## 📌 Project Overview
