@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -15,25 +14,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class QuestionRequest(BaseModel):
     question: str
     session_id: str
+
 
 @app.get("/health")
 def health_check():
     return {"status": "FinTrustRAG backend is running ✅"}
 
+
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files accepted")
+
     session_id = str(uuid.uuid4())[:8]
     os.makedirs("data", exist_ok=True)
     save_path = f"data/{session_id}_{file.filename}"
+
     content = await file.read()
     with open(save_path, "wb") as f:
         f.write(content)
+
     print(f"📁 Saved PDF: {save_path}")
+
     try:
         from ingestion import ingest_pdf
         chunks = ingest_pdf(save_path, session_id)
@@ -45,8 +51,9 @@ async def upload_pdf(file: UploadFile = File(...)):
             "chunks_created": len(chunks)
         }
     except Exception as e:
-        print(f"❌ Ingestion error: {e}")
+        print(f"❌ Error during ingestion: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/ask")
 async def ask_question(request: QuestionRequest):
@@ -54,38 +61,49 @@ async def ask_question(request: QuestionRequest):
         from ingestion import load_chunks
         from retrieval import retrieve
         from generation import generate_answer
-        from ncts import compute_ncts
+        from ncts import run_ncts
 
-        chunks     = load_chunks(request.session_id)
+        # Step 1: Load chunks
+        chunks = load_chunks(request.session_id)
+
+        # Step 2: Retrieve top 5 relevant chunks
         top_chunks = retrieve(request.question, request.session_id, chunks)
-        result     = generate_answer(request.question, top_chunks)
-        ncts_result = compute_ncts(result["answer"], top_chunks)
 
+        # Step 3: Generate answer using LLM
+        # NOTE: LLM receives FULL chunk text — no truncation here
+        answer = generate_answer(request.question, top_chunks)
+
+        # Step 4: Run NCTS on full chunks
+        ncts_result = run_ncts(answer, top_chunks)
+
+        # Step 5: Truncate only for display in source_chunks response
         source_chunks = [
             {
                 "chunk_id": c["chunk_id"],
                 "page_no": c["page_no"],
                 "section_label": c["section_label"],
-                "text": c["text"][:300] + "..."
+                "text": c["text"][:800] + "..."  # display only, LLM got full text
             }
             for c in top_chunks
         ]
 
         return {
-            "answer": result["answer"],
-            "model_used": result["model_used"],
+            "answer": answer,
+            "model_used": "llama-3.1-8b-instant",
             "ncts": ncts_result,
             "source_chunks": source_chunks,
             "session_id": request.session_id
         }
 
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Session not found. Upload PDF first.")
-    except RuntimeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(
+            status_code=404,
+            detail="Session not found. Upload PDF first."
+        )
     except Exception as e:
         print(f"❌ Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

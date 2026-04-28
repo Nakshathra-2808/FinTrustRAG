@@ -13,6 +13,21 @@ DATA_DIR = "data"
 
 _embedder = None
 
+# Keywords that should boost specific section types
+SECTION_BOOST_MAP = {
+    "free cash flow": "Cash Flow",
+    "fcf": "Cash Flow",
+    "operating cash": "Cash Flow",
+    "capital expenditure": "Cash Flow",
+    "capex": "Cash Flow",
+    "net income": "Income Statement",
+    "gross margin": "Income Statement",
+    "revenue": "Income Statement",
+    "net sales": "Income Statement",
+    "total assets": "Balance Sheet",
+    "liabilities": "Balance Sheet",
+}
+
 
 def get_embedder():
     global _embedder
@@ -65,27 +80,55 @@ def load_indexes(session_id: str):
     return faiss_index, bm25_index
 
 
+def get_section_boost(question: str, chunk: dict) -> float:
+    """
+    Boost score for chunks whose section_label matches
+    what the question is asking about.
+    
+    WHY: BM25 matches on keywords like "cash" or "flow"
+    which appear throughout the document. This ensures
+    actual Cash Flow statement chunks rank above prose
+    sections that merely mention cash flow in passing.
+    """
+    question_lower = question.lower()
+    for keyword, target_section in SECTION_BOOST_MAP.items():
+        if keyword in question_lower:
+            if chunk.get("section_label") == target_section:
+                return 0.02  # Add to RRF score (meaningful boost)
+    return 0.0
+
+
 def retrieve(question: str, session_id: str, chunks: list) -> list:
     print(f"🔍 Retrieving for: '{question[:50]}'")
     embedder = get_embedder()
     faiss_index, bm25_index = load_indexes(session_id)
 
+    # Dense retrieval
     query_vector = np.array(
         embedder.encode([question])
     ).astype(np.float32)
     _, indices = faiss_index.search(query_vector, TOP_K)
     dense_ids = [i for i in indices[0].tolist() if i != -1]
 
+    # Sparse retrieval
     bm25_scores = bm25_index.get_scores(question.lower().split())
     sparse_ids = np.argsort(bm25_scores)[::-1][:TOP_K].tolist()
 
+    # RRF fusion
     scores = {}
     for rank, doc_id in enumerate(dense_ids):
         scores[doc_id] = scores.get(doc_id, 0) + 1 / (RRF_K + rank + 1)
     for rank, doc_id in enumerate(sparse_ids):
         scores[doc_id] = scores.get(doc_id, 0) + 1 / (RRF_K + rank + 1)
 
+    # Section label boost
+    for doc_id in scores:
+        if doc_id < len(chunks):
+            scores[doc_id] += get_section_boost(question, chunks[doc_id])
+
     fused_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
     top_chunks = [chunks[i] for i in fused_ids[:TOP_N] if i < len(chunks)]
-    print(f"✅ Retrieved {len(top_chunks)} chunks")
+
+    print(f"✅ Retrieved {len(top_chunks)} chunks from sections: "
+          f"{[c['section_label'] for c in top_chunks]}")
     return top_chunks
