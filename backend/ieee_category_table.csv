@@ -1,0 +1,8 @@
+Category,Total Qs,Answered,Insuff. Ctx,Errors,Answer Rate %,Avg Trust (T),Avg Grounding (G),HIGH,MEDIUM,LOW,HIGH %,Math Verified,Math PASS,Math Accuracy %,Avg Latency (ms)
+Income Statement,25,20,5,0,80.0,0.998,0.998,20,0,0,100.0,0,0,—,26852
+Cash Flow,25,18,7,0,72.0,0.951,0.951,16,2,0,88.9,0,0,—,40360
+Balance Sheet,25,20,5,0,80.0,0.979,0.979,20,0,0,100.0,0,0,—,30368
+Financial Ratios,25,9,15,1,36.0,0.981,0.981,9,0,0,100.0,3,3,100.0,32168
+Per Share and Equity,15,13,2,0,86.7,0.934,0.963,12,1,0,92.3,2,1,50.0,30357
+YoY and Growth,15,13,2,0,86.7,0.792,0.938,8,5,0,61.5,6,1,16.7,25955
+Business and Operations,20,8,7,5,40.0,0.782,0.782,6,0,2,75.0,0,0,—,28128

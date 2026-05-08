@@ -1,3 +1,4 @@
+
 # generation.py
 # ONE JOB: Take question + chunks → Call Groq → Return answer string
 
@@ -11,11 +12,15 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 SYSTEM_PROMPT = """You are a financial document analysis assistant.
 Answer the following question using ONLY the information provided in the context passages below.
-State all numerical figures EXACTLY as they appear in the source documents.
-Do not round, convert or paraphrase numbers.
-Give a direct, concise answer.
-If the context does not contain enough information, respond with:
-'The requested information is not available in the provided document sections.'"""
+
+Rules:
+1. State all numerical figures EXACTLY as they appear in the source documents.
+2. Do not round, estimate, or paraphrase numbers.
+3. When performing calculations (e.g. free cash flow, margins, ratios), show the formula and each input value clearly.
+4. Always state which fiscal year or period the figures relate to.
+5. If the context does not contain enough information to answer, respond with exactly:
+   'The requested information is not available in the provided document sections.'
+6. Do not use external knowledge — only the provided context passages."""
 
 
 def generate_answer(question: str, chunks: list) -> str:
@@ -46,7 +51,8 @@ def generate_answer(question: str, chunks: list) -> str:
 
 Question: {question}
 
-Provide a direct answer using only the above context:"""
+Provide a direct answer using only the above context.
+If this involves a calculation, show: formula used, input values from source, and final result."""
 
     # Call Groq API
     response = client.chat.completions.create(
@@ -59,7 +65,6 @@ Provide a direct answer using only the above context:"""
         max_tokens=512
     )
 
-    # Extract just the text answer
     answer = response.choices[0].message.content.strip()
     print(f"✅ Answer generated: {answer[:100]}...")
     return answer

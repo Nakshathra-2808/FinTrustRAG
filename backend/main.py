@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -82,7 +83,7 @@ async def ask_question(request: QuestionRequest):
                 "chunk_id": c["chunk_id"],
                 "page_no": c["page_no"],
                 "section_label": c["section_label"],
-                "text": c["text"][:800] + "..."  # display only, LLM got full text
+                "text": c["text"][:800] + "..."
             }
             for c in top_chunks
         ]

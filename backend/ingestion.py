@@ -1,3 +1,4 @@
+
 import pymupdf4llm
 import os
 import pickle
@@ -10,12 +11,38 @@ DATA_DIR = "data"
 
 def detect_section(text: str) -> str:
     t = text.lower()
-    if any(k in t for k in ["cash flow", "operating activities", "investing activities", "financing activities"]):
+    if any(k in t for k in [
+        "cash flow", "operating activities",
+        "investing activities", "financing activities",
+        "capital expenditure", "capex",
+        "purchases of property", "property plant",
+        "plant and equipment", "free cash flow"
+    ]):
         return "Cash Flow"
-    elif any(k in t for k in ["revenue", "net income", "earnings", "net sales", "gross margin"]):
+    elif any(k in t for k in [
+        "revenue", "net income", "earnings",
+        "net sales", "gross margin",
+        "cost of revenue", "cost of goods",
+        "operating income", "operating expenses",
+        "gross profit", "net revenue",
+        "total net sales", "products and services"
+    ]):
         return "Income Statement"
-    elif any(k in t for k in ["total assets", "liabilities", "balance sheet", "stockholders"]):
+    elif any(k in t for k in [
+        "total assets", "liabilities",
+        "balance sheet", "stockholders",
+        "shareholders equity", "shareholders' equity",
+        "stockholders' equity", "long-term debt",
+        "current assets", "current liabilities",
+        "retained earnings", "total equity"
+    ]):
         return "Balance Sheet"
+    elif any(k in t for k in [
+        "earnings per share", "diluted earnings",
+        "basic earnings", "diluted shares",
+        "weighted average shares", "eps"
+    ]):
+        return "EPS"
     elif any(k in t for k in ["notes to", "note 1", "note 2"]):
         return "Notes"
     return "Body"
@@ -43,10 +70,10 @@ def split_page_into_blocks(text: str) -> list:
     """
     Split a page into blocks, keeping markdown tables intact.
     Returns list of (block_text, is_table) tuples.
-    
-    WHY: Word-count chunking splits tables mid-row, 
-    cutting off financial figures. This keeps each table 
-    as one atomic block so numbers are never separated 
+
+    WHY: Word-count chunking splits tables mid-row,
+    cutting off financial figures. This keeps each table
+    as one atomic block so numbers are never separated
     from their row headers.
     """
     lines = text.split("\n")
@@ -58,7 +85,6 @@ def split_page_into_blocks(text: str) -> list:
         line_is_table = is_table_line(line)
 
         if line_is_table and not in_table:
-            # Flush current prose block
             if current_block:
                 blocks.append(("\n".join(current_block), False))
                 current_block = []
@@ -66,7 +92,6 @@ def split_page_into_blocks(text: str) -> list:
             current_block.append(line)
 
         elif not line_is_table and in_table:
-            # Flush current table block
             if current_block:
                 blocks.append(("\n".join(current_block), True))
                 current_block = []
@@ -78,11 +103,11 @@ def split_page_into_blocks(text: str) -> list:
             if line.strip():
                 current_block.append(line)
 
-    # Flush whatever remains
     if current_block:
         blocks.append(("\n".join(current_block), in_table))
 
     return blocks
+
 
 def split_into_chunks(pages: list) -> list:
     chunks = []
@@ -98,7 +123,6 @@ def split_into_chunks(pages: list) -> list:
             block_words = block_text.split()
 
             if is_table:
-                # Flush any accumulated prose first
                 if current_words:
                     flush_text = " ".join(current_words)
                     chunks.append({
@@ -110,11 +134,19 @@ def split_into_chunks(pages: list) -> list:
                     chunk_id += 1
                     current_words = []
 
-                # Check if this is a financial statement table
-                # If so, merge with next table block (they belong together)
                 section = detect_section(block_text[:200])
+
+                # Merge adjacent Cash Flow chunks so capex and operating CF
+                # are always in the same chunk — needed for FCF verification
                 if section == "Cash Flow" and chunks and chunks[-1].get("section_label") == "Cash Flow":
-                    # Merge with previous Cash Flow chunk instead of creating new one
+                    prev = chunks[-1]
+                    prev["text"] = prev["text"] + "\n" + block_text
+                # Merge adjacent Income Statement chunks similarly
+                elif section == "Income Statement" and chunks and chunks[-1].get("section_label") == "Income Statement":
+                    prev = chunks[-1]
+                    prev["text"] = prev["text"] + "\n" + block_text
+                # Merge adjacent Balance Sheet chunks
+                elif section == "Balance Sheet" and chunks and chunks[-1].get("section_label") == "Balance Sheet":
                     prev = chunks[-1]
                     prev["text"] = prev["text"] + "\n" + block_text
                 else:
@@ -149,13 +181,11 @@ def split_into_chunks(pages: list) -> list:
             })
             chunk_id += 1
 
-    # Re-number chunk_ids cleanly
     for i, chunk in enumerate(chunks):
         chunk["chunk_id"] = i
 
     print(f"✅ Created {len(chunks)} chunks")
     return chunks
-
 
 
 def save_chunks(chunks: list, session_id: str):
